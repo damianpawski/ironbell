@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- EF Core lives here. Kept provider-portable per ADR 0001 — no Dapper, no raw SQL. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ironbell.Domain\Ironbell.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

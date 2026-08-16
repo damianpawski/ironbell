@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure C#. No framework dependencies, by design — this project is referenced by the
+    WASM client as well as the API, so it must stay trimmable and host-agnostic.
+    An architecture test enforces the "no framework deps" rule.
+  -->
+
+  <PropertyGroup>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+</Project>

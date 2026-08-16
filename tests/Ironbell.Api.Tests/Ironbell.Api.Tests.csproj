@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Slice tests: real endpoints against a real database via Testcontainers.
+       For VSA this is the primary test type, not an afterthought. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ironbell.Api\Ironbell.Api.csproj" />
+  </ItemGroup>
+
+</Project>

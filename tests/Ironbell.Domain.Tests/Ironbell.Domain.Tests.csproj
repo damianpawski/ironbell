@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure unit tests over the domain core: timeline resolver, tonnage, PR rules. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ironbell.Domain\Ironbell.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

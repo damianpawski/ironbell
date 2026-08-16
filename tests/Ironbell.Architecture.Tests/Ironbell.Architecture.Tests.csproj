@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Boundary rules that fail the build: no cross-slice handler references,
+       no framework dependencies leaking into Ironbell.Domain. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ironbell.Api\Ironbell.Api.csproj" />
+    <ProjectReference Include="..\..\src\Ironbell.Domain\Ironbell.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Ironbell.Infrastructure\Ironbell.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

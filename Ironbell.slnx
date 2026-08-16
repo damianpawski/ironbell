@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ironbell.Api/Ironbell.Api.csproj" />
+    <Project Path="src/Ironbell.Client/Ironbell.Client.csproj" />
+    <Project Path="src/Ironbell.Domain/Ironbell.Domain.csproj" />
+    <Project Path="src/Ironbell.Infrastructure/Ironbell.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ironbell.Api.Tests/Ironbell.Api.Tests.csproj" />
+    <Project Path="tests/Ironbell.Architecture.Tests/Ironbell.Architecture.Tests.csproj" />
+    <Project Path="tests/Ironbell.Domain.Tests/Ironbell.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
