@@ -4,6 +4,10 @@
        no framework dependencies leaking into Ironbell.Domain. -->
 
   <ItemGroup>
+    <PackageReference Include="NetArchTest.eNhancedEdition" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Ironbell.Api\Ironbell.Api.csproj" />
     <ProjectReference Include="..\..\src\Ironbell.Domain\Ironbell.Domain.csproj" />
     <ProjectReference Include="..\..\src\Ironbell.Infrastructure\Ironbell.Infrastructure.csproj" />
