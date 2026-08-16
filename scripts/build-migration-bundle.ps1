@@ -54,6 +54,16 @@ try {
     dotnet tool restore
     if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore failed with exit code $LASTEXITCODE." }
 
+    # `dotnet ef` reads project metadata but never restores, so on a clean checkout it fails with
+    # NETSDK1004 before it does anything. A developer machine hides this because obj/ is already
+    # warm from previous builds; CI checks out cold and breaks. Restoring here rather than in the
+    # workflow keeps the script the single description of how a bundle is built.
+    #
+    # Restored for the target runtime because the bundle publishes RID-specific: a RID-agnostic
+    # restore produces an assets file with no target for $Runtime and fails later instead.
+    dotnet restore src/Ironbell.Infrastructure/Ironbell.Infrastructure.csproj --runtime $Runtime
+    if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed with exit code $LASTEXITCODE." }
+
     # Infrastructure is its own startup project so the design-time factory is used and the API host
     # -- which demands a real connection string -- never has to boot just to scaffold a bundle.
     $arguments = @(
