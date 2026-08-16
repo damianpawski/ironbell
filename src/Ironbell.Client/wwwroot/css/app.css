@@ -5,10 +5,28 @@
    Weight colours are the competition kettlebell code used functionally — a bell
    is coloured because of what it weighs, never for decoration.
 
-   Archivo and Public Sans are named first but are not yet self-hosted, so the
-   stack falls through to system faces until the woff2 files are added. Google
-   Fonts is not an option: a CDN breaks both the CSP and offline-first.
+   Archivo and Public Sans are self-hosted, latin subset only. A CDN was never an
+   option: it breaks the CSP and it breaks offline-first. Both are SIL OFL 1.1
+   and their licences ship beside them in wwwroot/fonts.
    --------------------------------------------------------------------------- */
+
+@font-face {
+    font-family: "Archivo";
+    src: url("../fonts/archivo-700-latin.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Variable font: one file covers the whole weight range, so the text face costs
+   a single request rather than one per weight. */
+@font-face {
+    font-family: "Public Sans";
+    src: url("../fonts/public-sans-variable-latin.woff2") format("woff2");
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+}
 
 :root {
     /* Iron ramp */
