@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A superseded push has nothing useful to say; cancel it rather than pay for it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  test:
+    name: test (${{ matrix.provider }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Both providers report. Stopping at the first failure would hide whether a break is
+      # provider-specific, which is the single most useful thing this matrix can tell us.
+      fail-fast: false
+      matrix:
+        provider: [Postgres, SqlServer]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Ironbell.slnx
+
+      - name: Build
+        run: dotnet build Ironbell.slnx --configuration Release --no-restore
+
+      # ADR 0001's actual enforcement. Production is SQL Server; PostgreSQL is the provider the
+      # layer must stay portable to. Running the same suite against both is what keeps that claim
+      # honest rather than aspirational. Testcontainers supplies the databases.
+      - name: Test
+        env:
+          IRONBELL_TEST_PROVIDER: ${{ matrix.provider }}
+        run: dotnet test Ironbell.slnx --configuration Release --no-build
+
+  bundle-budget:
+    name: wasm bundle budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # The budget check runs inside publish and fails the build on its own, so there is nothing to
+      # assert here. Kept as its own job so the payload size is visible without reading test logs.
+      - name: Publish and check payload size
+        run: dotnet publish src/Ironbell.Api/Ironbell.Api.csproj --configuration Release --output publish
+
+  migration-bundle:
+    name: migration bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build bundle
+        shell: pwsh
+        run: ./scripts/build-migration-bundle.ps1
+
+      # Migrations are applied as a pipeline step and never on application startup, so the deploy
+      # needs this artifact rather than the app doing it on boot.
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-bundle
+          path: artifacts/efbundle
+          retention-days: 7
+          if-no-files-found: error
+
+  image:
+    name: image
+    runs-on: ubuntu-latest
+    needs: [test, bundle-budget]
+    # Only main publishes. A pull request proves the image builds; it does not get to push one.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # The sha tag is what deployments pin to; latest is a convenience only.
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

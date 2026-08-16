@@ -1,0 +1,75 @@
+<Project>
+
+  <!--
+    Fails the publish when the WebAssembly payload grows past its budget.
+
+    Measured on the brotli-compressed framework assets, because that is what a browser actually
+    downloads on a cold load. The raw .wasm total is roughly three times larger and would be a
+    number nobody could act on.
+
+    The budget is a ratchet, not a target. It exists to make an accidental regression (a heavy
+    package pulled in transitively, or trimming silently switching off) fail loudly at the moment
+    it happens, rather than being noticed on a phone over mobile data months later.
+
+    Raise it deliberately and in its own commit, so the increase is reviewable.
+  -->
+
+  <PropertyGroup>
+    <!-- 3 MiB. Roughly 35% headroom over the M0 skeleton; the .NET runtime itself accounts for
+         about two thirds of the payload and does not grow with features. -->
+    <WasmBundleBudgetBytes Condition="'$(WasmBundleBudgetBytes)' == ''">3145728</WasmBundleBudgetBytes>
+  </PropertyGroup>
+
+  <UsingTask TaskName="MeasureWasmBundle"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <TotalBytes ParameterType="System.Int64" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        long total = 0;
+        foreach (var file in Files)
+        {
+            var info = new System.IO.FileInfo(file.ItemSpec);
+            if (info.Exists)
+            {
+                total += info.Length;
+            }
+        }
+        TotalBytes = total;
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="CheckWasmBundleBudget"
+          AfterTargets="Publish"
+          Condition="'$(SkipWasmBundleBudget)' != 'true'">
+
+    <ItemGroup>
+      <_WasmCompressedAsset Include="$(PublishDir)wwwroot/_framework/*.br" />
+    </ItemGroup>
+
+    <MeasureWasmBundle Files="@(_WasmCompressedAsset)">
+      <Output TaskParameter="TotalBytes" PropertyName="_WasmBundleBytes" />
+    </MeasureWasmBundle>
+
+    <!-- Silence is the enemy here: a budget nobody sees the number for is a budget nobody notices
+         creeping. Printed on every publish, pass or fail. -->
+    <Message Importance="high"
+             Condition="'@(_WasmCompressedAsset)' != ''"
+             Text="WASM payload (brotli): $([MSBuild]::Divide($(_WasmBundleBytes), 1024)) KiB of $([MSBuild]::Divide($(WasmBundleBudgetBytes), 1024)) KiB budget." />
+
+    <!-- No assets found means the measurement silently passed against nothing, which is worse than
+         being over budget because it never fails again. -->
+    <Error Condition="'@(_WasmCompressedAsset)' == ''"
+           Text="WASM bundle budget could not be measured: no brotli assets under $(PublishDir)wwwroot/_framework. The check must not pass by finding nothing." />
+
+    <Error Condition="$(_WasmBundleBytes) &gt; $(WasmBundleBudgetBytes)"
+           Text="WASM payload is $([MSBuild]::Divide($(_WasmBundleBytes), 1024)) KiB, over the $([MSBuild]::Divide($(WasmBundleBudgetBytes), 1024)) KiB budget. Reduce it, or raise WasmBundleBudgetBytes in build/WasmBundleBudget.targets in its own commit." />
+  </Target>
+
+</Project>
