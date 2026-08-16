@@ -3,6 +3,11 @@
   <!-- Minimal API host. Feature slices live in Features/; the published client is
        served from this container (same origin), wired up in a later step. -->
 
+  <PropertyGroup>
+    <!-- Local secrets use the same key names the deployed vault will use. -->
+    <UserSecretsId>ironbell-api-5f3a1c9e-2b47-4d80-9a16-c7e5b0d84f21</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Serilog.AspNetCore" />
   </ItemGroup>

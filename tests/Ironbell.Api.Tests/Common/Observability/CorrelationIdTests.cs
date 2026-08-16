@@ -1,10 +1,10 @@
 using Ironbell.Api.Common.Observability;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Ironbell.Api.Tests.Infrastructure;
 
 namespace Ironbell.Api.Tests.Common.Observability;
 
-public sealed class CorrelationIdTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+[Collection(SharedDatabase.Name)]
+public sealed class CorrelationIdTests(DatabaseFixture database)
 {
     private static readonly Uri PingRoute = new("/api/health/ping", UriKind.Relative);
 
@@ -60,7 +60,7 @@ public sealed class CorrelationIdTests(WebApplicationFactory<Program> factory)
 
     private async Task<string> GetCorrelationIdAsync(string? supplied)
     {
-        using var client = factory.CreateClient();
+        using var client = database.Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, PingRoute);
 
         if (supplied is not null)

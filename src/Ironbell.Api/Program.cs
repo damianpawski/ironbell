@@ -1,6 +1,7 @@
 using Ironbell.Api.Common.Messaging;
 using Ironbell.Api.Common.Observability;
 using Ironbell.Api.Features;
+using Ironbell.Infrastructure;
 using Serilog;
 
 // Bootstrap logger, so anything that fails before configuration is read still reaches the console.
@@ -20,6 +21,15 @@ builder.Services.AddSerilog((services, configuration) => configuration
     .Enrich.FromLogContext());
 
 builder.Services.AddSingleton(TimeProvider.System);
+
+// Migrations are applied as a pipeline step, never on startup — see the M0 build list. The app
+// assumes the schema is already there.
+builder.Services.AddIronbellDatabase(
+    builder.Configuration.GetValue("Database:Provider", DatabaseProvider.SqlServer),
+    builder.Configuration.GetConnectionString("Ironbell")
+        ?? throw new InvalidOperationException(
+            "Connection string 'Ironbell' is not configured. Locally this comes from user-secrets."));
+
 builder.Services.AddMessaging();
 builder.Services.AddFeatures();
 

@@ -3,7 +3,20 @@
   <!-- EF Core lives here. Kept provider-portable per ADR 0001 — no Dapper, no raw SQL. -->
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <!-- Design-time only: enables `dotnet ef`, ships nothing to the container. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Ironbell.Domain\Ironbell.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ironbell.Api.Tests" />
   </ItemGroup>
 
 </Project>

@@ -194,6 +194,16 @@ dotnet_naming_rule.parameters_and_locals_are_camel_case.style = camel_case
 dotnet_naming_rule.parameters_and_locals_are_camel_case.severity = warning
 
 # ---------------------------------------------------------------------------
+# EF Core migrations are scaffolded, not written. Holding generated output to
+# hand-written style rules only invites editing files EF will regenerate.
+# ---------------------------------------------------------------------------
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.IDE0005.severity = none
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+# ---------------------------------------------------------------------------
 # Test projects — relax the rules that fight readable test names.
 # ---------------------------------------------------------------------------
 [tests/**/*.cs]

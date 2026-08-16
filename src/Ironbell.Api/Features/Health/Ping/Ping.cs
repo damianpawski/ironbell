@@ -1,4 +1,6 @@
 using Ironbell.Api.Common.Messaging;
+using Ironbell.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace Ironbell.Api.Features.Health.Ping;
 
@@ -11,15 +13,24 @@ public sealed record PingRequest : IRequest<PingResponse>;
 /// <param name="Status">Always <c>ok</c>; a failure surfaces as a non-200 instead.</param>
 /// <param name="Utc">Server clock. UTC <see cref="DateTime"/>, never <see cref="DateTimeOffset"/>,
 /// per ADR 0001.</param>
-public sealed record PingResponse(string Status, DateTime Utc);
+/// <param name="SchemaVersion">Read from the database, so a green ping proves the round trip
+/// rather than just that the process is alive.</param>
+public sealed record PingResponse(string Status, DateTime Utc, string SchemaVersion);
 
-internal sealed class PingHandler(TimeProvider timeProvider)
+internal sealed class PingHandler(TimeProvider timeProvider, IronbellDbContext dbContext)
     : IHandler<PingRequest, PingResponse>
 {
-    public ValueTask<PingResponse> HandleAsync(
+    public async ValueTask<PingResponse> HandleAsync(
         PingRequest request,
-        CancellationToken cancellationToken) =>
-        ValueTask.FromResult(new PingResponse("ok", timeProvider.GetUtcNow().UtcDateTime));
+        CancellationToken cancellationToken)
+    {
+        var schemaVersion = await dbContext.AppInfo
+            .AsNoTracking()
+            .Select(appInfo => appInfo.SchemaVersion)
+            .FirstAsync(cancellationToken);
+
+        return new PingResponse("ok", timeProvider.GetUtcNow().UtcDateTime, schemaVersion);
+    }
 }
 
 internal static class PingSlice
