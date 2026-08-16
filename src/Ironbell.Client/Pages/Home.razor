@@ -1,7 +1,68 @@
-﻿@page "/"
+@page "/"
+@inject HttpClient Http
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Ironbell</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1 class="probe__title">Walking skeleton</h1>
+<p class="probe__lede">
+    Browser to API to database, on one origin. Nothing here is a feature — it exists so the
+    deployment path is proven before anything is built on it.
+</p>
 
-Welcome to your new app.
+@if (_error is not null)
+{
+    <div class="readout">
+        <div class="readout__row">
+            <span class="readout__label">API</span>
+            <span class="readout__value readout__value--fail">unreachable</span>
+        </div>
+        <div class="readout__row">
+            <span class="readout__label">Detail</span>
+            <span class="readout__value">@_error</span>
+        </div>
+    </div>
+}
+else if (_ping is null)
+{
+    <p class="status" aria-live="polite">Probing…</p>
+}
+else
+{
+    <div class="readout">
+        <div class="readout__row">
+            <span class="readout__label">API</span>
+            <span class="readout__value readout__value--ok">@_ping.Status</span>
+        </div>
+        <div class="readout__row">
+            <span class="readout__label">Schema</span>
+            <span class="readout__value">@_ping.SchemaVersion</span>
+        </div>
+        <div class="readout__row">
+            <span class="readout__label">Server UTC</span>
+            <span class="readout__value">@_ping.Utc.ToString("O", CultureInfo.InvariantCulture)</span>
+        </div>
+    </div>
+}
+
+@code {
+    private PingResponse? _ping;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Relative URI: the client is served from the API, so this is same-origin by
+            // construction rather than by configuration.
+            _ping = await Http.GetFromJsonAsync<PingResponse>("api/health/ping");
+        }
+        catch (HttpRequestException exception)
+        {
+            // Say what actually happened. An offline-first app that lies about being online is
+            // worse than one that admits it cannot reach the server.
+            _error = exception.Message;
+        }
+    }
+
+    private sealed record PingResponse(string Status, DateTime Utc, string SchemaVersion);
+}

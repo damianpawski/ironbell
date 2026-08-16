@@ -1,3 +1,4 @@
+using System.Globalization;
 using Ironbell.Api.Common.Messaging;
 using Ironbell.Api.Common.Observability;
 using Ironbell.Api.Features;
@@ -10,7 +11,8 @@ using Serilog;
 // one process, and the second freeze throws. A plain logger makes that failure impossible instead
 // of asking every future test class to share one WebApplicationFactory.
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
+    // Invariant so log output does not vary with the host's locale.
+    .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture)
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,7 +42,14 @@ var app = builder.Build();
 app.UseCorrelationId();
 app.UseSerilogRequestLogging();
 
+// Same origin as the API, in development as well as in the container, so the two never diverge.
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
+
 app.MapFeatures();
+
+// Client-side routes are not API routes: anything unmatched hands back the WASM shell.
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

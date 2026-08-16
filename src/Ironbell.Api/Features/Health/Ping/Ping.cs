@@ -24,8 +24,11 @@ internal sealed class PingHandler(TimeProvider timeProvider, IronbellDbContext d
         PingRequest request,
         CancellationToken cancellationToken)
     {
+        // Ordered explicitly: EF warns that First without OrderBy has undefined results, and two
+        // providers are free to disagree about which row "first" means.
         var schemaVersion = await dbContext.AppInfo
             .AsNoTracking()
+            .OrderBy(appInfo => appInfo.Id)
             .Select(appInfo => appInfo.SchemaVersion)
             .FirstAsync(cancellationToken);
 

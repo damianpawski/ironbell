@@ -6,6 +6,10 @@
   <PropertyGroup>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+    <!-- Drops the ICU data from the payload, which is worth over a megabyte against the bundle
+         budget. Safe here because the client formats UTC instants and invariant numbers only.
+         It is set per project rather than repo-wide: SqlClient cannot run under invariant mode. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

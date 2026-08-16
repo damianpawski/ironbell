@@ -5,7 +5,10 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Deliberately NOT InvariantGlobalization here. Microsoft.Data.SqlClient throws
+         "Globalization Invariant Mode is not supported" on first connect, so it cannot be a
+         solution-wide default. Npgsql tolerates it, which is exactly why this hid until the
+         first real SQL Server connection. The WASM client opts in on its own. -->
   </PropertyGroup>
 
   <!-- Warnings are errors from commit one. Cheap now, miserable to retrofit. -->
