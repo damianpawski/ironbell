@@ -16,8 +16,11 @@ scripts/
 tests/
 *.md
 compose.yaml
-.editorconfig
 .gitattributes
 .gitignore
 .dockerignore
 Dockerfile
+
+# NOT excluded, deliberately: .editorconfig carries the analyser severities, including the
+# suppressions for EF's generated migrations. With TreatWarningsAsErrors, omitting it does not
+# relax the build -- it breaks it, and only inside the container.

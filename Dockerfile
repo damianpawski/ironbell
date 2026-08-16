@@ -11,7 +11,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Manifests first, so editing code does not invalidate the restore layer.
-COPY global.json Directory.Build.props Directory.Packages.props ./
+# .editorconfig is part of the build, not editor decoration: it carries the analyser severities,
+# and with TreatWarningsAsErrors its absence fails the compile rather than loosening it.
+COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 # build/ holds targets imported by Ironbell.Api.csproj. Imports resolve when the project loads, so
 # this has to be here before restore, not alongside the source.
 COPY build/ build/
