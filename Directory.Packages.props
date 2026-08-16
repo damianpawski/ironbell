@@ -1,0 +1,15 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!--
+    Every PackageVersion for the solution lives here; projects reference by name only.
+    Populated as the milestone steps need them.
+  -->
+  <ItemGroup>
+  </ItemGroup>
+
+</Project>

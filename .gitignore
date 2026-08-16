@@ -1,0 +1,92 @@
+## .NET
+
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+
+## Build results
+
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Oo]ut/
+[Ll]og/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+## Visual Studio / Rider / VS Code
+
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.sln.iml
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+## Test results
+
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+TestResults/
+BenchmarkDotNet.Artifacts/
+
+## NuGet
+
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+## Secrets — never commit these
+
+appsettings.*.local.json
+appsettings.Local.json
+*.pfx
+*.p12
+.env
+.env.*
+!.env.example
+secrets.json
+
+## Blazor / WASM
+
+**/wwwroot/_framework/
+**/wwwroot/service-worker-assets.js
+compressed/
+
+## EF Core
+
+*.dbmdl
+*.jfm
+
+## OS
+
+.DS_Store
+Thumbs.db
+desktop.ini
