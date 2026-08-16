@@ -126,3 +126,81 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    needs: [test, bundle-budget, migration-bundle, image]
+    # Inert until DEPLOY_ENABLED is set to 'true' in repository variables, so this workflow can be
+    # merged and exercised long before any Azure subscription exists. A missing secret would
+    # otherwise fail every run on main for a reason unrelated to the change that triggered it.
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && vars.DEPLOY_ENABLED == 'true'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # The migration bundle is framework-dependent, so the runtime has to be here. That is the
+      # dependency accepted when the bundle stopped being self-contained.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: migration-bundle
+          path: bundle
+
+      - run: chmod +x bundle/efbundle
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Container Apps has no stable outbound IP on consumption, so the server keeps only the
+      # Azure-services rule. The runner needs its own, and only for as long as the migration takes.
+      - name: Open the firewall for this runner
+        id: firewall
+        run: |
+          ip=$(curl -fsS https://api.ipify.org)
+          echo "rule=gh-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          az sql server firewall-rule create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "${{ vars.AZURE_SQL_SERVER }}" \
+            --name "gh-${{ github.run_id }}" \
+            --start-ip-address "$ip" --end-ip-address "$ip" --output none
+
+      # Applied here and never on application startup. A container that boots cannot alter the
+      # schema, and replicas cannot race each other to migrate.
+      - name: Apply migrations
+        run: ./bundle/efbundle --connection "${{ secrets.SQL_CONNECTION_STRING }}"
+
+      # always(), so a failed migration does not leave the runner's address authorised.
+      - name: Close the firewall
+        if: always() && steps.firewall.outcome == 'success'
+        run: |
+          az sql server firewall-rule delete \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "${{ vars.AZURE_SQL_SERVER }}" \
+            --name "${{ steps.firewall.outputs.rule }}" --output none
+
+      # Migrations first, image second: the new schema is in place before any container serving the
+      # new code exists. Pinned to the commit sha rather than latest, so a rollback is a redeploy of
+      # a known tag rather than a race with whatever latest points at.
+      - name: Deploy the image
+        run: |
+          az containerapp update \
+            --name "${{ vars.AZURE_CONTAINER_APP }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "ghcr.io/${{ github.repository }}:sha-${{ github.sha }}" \
+            --output none
+
+      - name: Report the deployed revision
+        run: |
+          az containerapp show \
+            --name "${{ vars.AZURE_CONTAINER_APP }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "{url:properties.configuration.ingress.fqdn,image:properties.template.containers[0].image}" \
+            --output table
