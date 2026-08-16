@@ -4,6 +4,10 @@
        For VSA this is the primary test type, not an afterthought. -->
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Ironbell.Api\Ironbell.Api.csproj" />
   </ItemGroup>
 

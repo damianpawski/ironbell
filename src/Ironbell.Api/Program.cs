@@ -1,8 +1,15 @@
+using Ironbell.Api.Common.Messaging;
+using Ironbell.Api.Features;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddMessaging();
+builder.Services.AddFeatures();
 
 var app = builder.Build();
 
-app.MapGet("/", () => "Ironbell API");
+app.MapFeatures();
 
 app.Run();
 

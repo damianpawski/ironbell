@@ -8,4 +8,9 @@
     <ProjectReference Include="..\Ironbell.Infrastructure\Ironbell.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Slices and the dispatcher are internal; the tests exercise them directly. -->
+    <InternalsVisibleTo Include="Ironbell.Api.Tests" />
+  </ItemGroup>
+
 </Project>
