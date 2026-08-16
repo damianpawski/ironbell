@@ -73,9 +73,8 @@ No milestone is complete until all five are true:
 real domain, so this cannot be deferred past week one.
 
 > **Hosting decision → see `ironbell-plan-v3-azure.md`.** Azure was chosen over a
-> self-managed VPS as a **hiring showcase** (Azure + .NET is what the Dublin market screens
-> for) while keeping the identical Docker-image and CI/CD story. v3 pins the specifics:
-> **Azure SQL Database (free offer)** for the DB, **Container Apps** (Consumption,
+> self-managed VPS, while keeping the identical Docker-image and CI/CD story. v3 pins the
+> specifics: **Azure SQL Database (free offer)** for the DB, **Container Apps** (Consumption,
 > scale-to-zero) for the API with the **client served from the same container**, and
 > **GHCR** for the image. Not Postgres Flexible Server — the SQL free offer is free
 > indefinitely rather than for 12 months. Consider a small **Bicep** file so the resources
