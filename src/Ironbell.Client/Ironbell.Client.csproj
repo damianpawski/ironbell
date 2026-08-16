@@ -4,7 +4,14 @@
        hard requirement for offline training mode. -->
 
   <PropertyGroup>
-    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!-- Off deliberately. Placeholder substitution injects an inline <script type="importmap">
+         holding the fingerprinted asset names, and an inline script cannot be allowed by a strict
+         CSP without 'unsafe-inline', a nonce, or a hash. A hash is not viable here: the map's
+         content changes per build and even differs between Development and Production, since
+         Development adds hot-reload entries. Removing the inline script is simpler and keeps the
+         policy identical everywhere. Cache correctness for the PWA comes from the service worker's
+         asset manifest, which is the mechanism that actually matters offline. -->
+    <OverrideHtmlAssetPlaceholders>false</OverrideHtmlAssetPlaceholders>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
     <!-- Drops the ICU data from the payload, which is worth over a megabyte against the bundle
          budget. Safe here because the client formats UTC instants and invariant numbers only.

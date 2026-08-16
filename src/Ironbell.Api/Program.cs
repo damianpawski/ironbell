@@ -1,6 +1,7 @@
 using System.Globalization;
 using Ironbell.Api.Common.Messaging;
 using Ironbell.Api.Common.Observability;
+using Ironbell.Api.Common.Security;
 using Ironbell.Api.Features;
 using Ironbell.Infrastructure;
 using Serilog;
@@ -34,8 +35,17 @@ builder.Services.AddIronbellDatabase(
 
 builder.Services.AddMessaging();
 builder.Services.AddFeatures();
+builder.Services.AddOpenApi();
+
+// No CORS, on purpose. The client is served from this host, so every call the browser makes is
+// same-origin. Registering a policy would create the cross-origin surface the architecture exists
+// to avoid, and `connect-src 'self'` in the CSP would refuse it anyway. If a second origin is ever
+// genuinely needed, that is a decision to take deliberately rather than a default left switched on.
 
 var app = builder.Build();
+
+// First in the pipeline so error responses and static files carry the headers too.
+app.UseIronbellSecurityHeaders();
 
 // Order matters: the correlation id has to be on the log context before request logging closes
 // its completion line, otherwise that line is the one entry missing the id.
@@ -47,6 +57,13 @@ app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
 app.MapFeatures();
+
+if (app.Environment.IsDevelopment())
+{
+    // Development only: the schema describes the whole API surface, which is not something to
+    // publish for a single-user app.
+    app.MapOpenApi();
+}
 
 // Client-side routes are not API routes: anything unmatched hands back the WASM shell.
 app.MapFallbackToFile("index.html");
