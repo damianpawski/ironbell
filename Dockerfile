@@ -12,6 +12,9 @@ WORKDIR /src
 
 # Manifests first, so editing code does not invalidate the restore layer.
 COPY global.json Directory.Build.props Directory.Packages.props ./
+# build/ holds targets imported by Ironbell.Api.csproj. Imports resolve when the project loads, so
+# this has to be here before restore, not alongside the source.
+COPY build/ build/
 COPY src/Ironbell.Domain/Ironbell.Domain.csproj src/Ironbell.Domain/
 COPY src/Ironbell.Infrastructure/Ironbell.Infrastructure.csproj src/Ironbell.Infrastructure/
 COPY src/Ironbell.Client/Ironbell.Client.csproj src/Ironbell.Client/
