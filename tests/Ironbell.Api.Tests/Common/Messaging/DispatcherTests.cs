@@ -31,7 +31,7 @@ public class DispatcherTests
     [Fact]
     public async Task Missing_handler_fails_loudly_rather_than_silently()
     {
-        var services = new ServiceCollection().AddMessaging().BuildServiceProvider();
+        var services = new ServiceCollection().AddLogging().AddMessaging().BuildServiceProvider();
         var dispatcher = services.GetRequiredService<IDispatcher>();
 
         await Should.ThrowAsync<InvalidOperationException>(async () =>
@@ -40,7 +40,8 @@ public class DispatcherTests
 
     private static IDispatcher BuildDispatcher(List<string> log, params string[] behaviourNames)
     {
-        var services = new ServiceCollection().AddMessaging();
+        // AddMessaging registers LoggingBehaviour, which needs a logger to construct.
+        var services = new ServiceCollection().AddLogging().AddMessaging();
         services.AddScoped<IHandler<TestRequest, string>>(_ => new TestHandler(log));
 
         foreach (var name in behaviourNames)

@@ -4,6 +4,10 @@
        served from this container (same origin), wired up in a later step. -->
 
   <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Ironbell.Domain\Ironbell.Domain.csproj" />
     <ProjectReference Include="..\Ironbell.Infrastructure\Ironbell.Infrastructure.csproj" />
   </ItemGroup>

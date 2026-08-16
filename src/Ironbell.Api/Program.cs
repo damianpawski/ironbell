@@ -1,13 +1,34 @@
 using Ironbell.Api.Common.Messaging;
+using Ironbell.Api.Common.Observability;
 using Ironbell.Api.Features;
+using Serilog;
+
+// Bootstrap logger, so anything that fails before configuration is read still reaches the console.
+// Deliberately CreateLogger and not CreateBootstrapLogger: the latter installs a ReloadableLogger
+// on the process-wide Log.Logger, which the host then freezes. Slice tests build several hosts in
+// one process, and the second freeze throws. A plain logger makes that failure impossible instead
+// of asking every future test class to share one WebApplicationFactory.
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSerilog((services, configuration) => configuration
+    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext());
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddMessaging();
 builder.Services.AddFeatures();
 
 var app = builder.Build();
+
+// Order matters: the correlation id has to be on the log context before request logging closes
+// its completion line, otherwise that line is the one entry missing the id.
+app.UseCorrelationId();
+app.UseSerilogRequestLogging();
 
 app.MapFeatures();
 
