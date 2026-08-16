@@ -1,0 +1,23 @@
+# Keep the build context small and, more importantly, keep host build output from leaking into
+# the image. Copying a host bin/ in would produce a container built from artefacts nobody can
+# reproduce — the image must come from source every time.
+**/bin/
+**/obj/
+artifacts/
+
+.git/
+.github/
+.vs/
+.idea/
+.config/
+
+docs/
+scripts/
+tests/
+*.md
+compose.yaml
+.editorconfig
+.gitattributes
+.gitignore
+.dockerignore
+Dockerfile
