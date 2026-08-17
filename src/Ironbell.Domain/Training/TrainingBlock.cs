@@ -11,9 +11,6 @@ namespace Ironbell.Domain.Training;
 /// </remarks>
 public abstract record TrainingBlock(string Name);
 
-/// <summary>A movement performed for a number of reps, as part of a larger block.</summary>
-public sealed record Effort(string Exercise, int Reps, BellWeight Weight);
-
 // --- rep-driven: the athlete's pace decides how long these take ---------------------------------
 
 /// <summary>Fixed sets of fixed reps, with rest between them.</summary>
@@ -60,9 +57,20 @@ public sealed record ComplexBlock(
 /// <summary>
 /// Several movements cycled through as one continuous set, repeated for sets.
 /// </summary>
+/// <param name="Name">Block name.</param>
+/// <param name="Links">Movements, with the reps performed on each pass through the cycle.</param>
+/// <param name="Cycles">How many times the sequence is repeated within a single set.</param>
+/// <param name="Sets">Number of sets.</param>
+/// <param name="Rest">Rest between sets.</param>
+/// <remarks>
+/// <see cref="Cycles"/> is what actually separates this from <see cref="ComplexBlock"/>. A complex
+/// of 5 cleans and 5 presses is five cleans then five presses; a chain of one clean and one press
+/// over five cycles is clean-press five times. The same total reps, a different set to perform.
+/// </remarks>
 public sealed record ChainBlock(
     string Name,
     IReadOnlyList<Effort> Links,
+    int Cycles,
     int Sets,
     TimeSpan Rest) : TrainingBlock(Name);
 

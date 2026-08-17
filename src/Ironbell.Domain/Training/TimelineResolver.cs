@@ -38,13 +38,24 @@ public static class TimelineResolver
     private static (TimeSpan? Limit, IReadOnlyList<TimelineStep> Steps) Expand(TrainingBlock block) =>
         block switch
         {
+            // Clock-driven: offsets are knowable before the session starts.
             EmomBlock emom => ExpandEmom(emom),
             IntervalBlock interval => ExpandInterval(interval),
             AmrapBlock amrap => ExpandAmrap(amrap),
             ForTimeBlock forTime => ExpandForTime(forTime),
+
+            // Rep-driven: the athlete's pace decides how long the work takes.
+            StraightBlock straight => ExpandStraight(straight),
+            CircuitBlock circuit => ExpandCircuit(circuit),
+            LadderBlock ladder => ExpandLadder(ladder),
+            ComplexBlock complex => ExpandComplex(complex),
+            ChainBlock chain => ExpandChain(chain),
+
             _ => throw new NotSupportedException(
-                $"'{block.GetType().Name}' is rep-driven and is not resolved yet."),
+                $"No expansion is defined for '{block.GetType().Name}'."),
         };
+
+    // --- clock-driven ------------------------------------------------------------------------
 
     /// <summary>
     /// One step per window. The leftover time inside a window is the rest, so no rest step is
@@ -59,7 +70,7 @@ public static class TimelineResolver
         {
             // The rotation cycles, so alternating work is one block rather than several.
             var effort = block.Rotation[round % block.Rotation.Count];
-            steps.Add(Work(effort, block.Interval));
+            steps.Add(Work([effort], block.Interval));
         }
 
         return (null, steps);
@@ -73,17 +84,17 @@ public static class TimelineResolver
     {
         var steps = new List<TimelineStep>(block.Rounds * 2);
 
+        // Reps are whatever fits the window, so none are prescribed.
+        var effort = new Effort(block.Exercise, Reps: null, block.Weight);
+
         for (var round = 0; round < block.Rounds; round++)
         {
             steps.Add(new TimelineStep(
                 Ordinal: 0,
                 StepKind.Work,
-                Description: $"{block.Exercise} @ {block.Weight} for {Describe(block.Work)}",
-                Exercise: block.Exercise,
-                // Reps are whatever the athlete manages inside the window, so none are prescribed.
-                Reps: null,
-                Weight: block.Weight,
-                Duration: block.Work));
+                $"{block.Exercise} @ {block.Weight} for {Describe(block.Work)}",
+                [effort],
+                block.Work));
 
             if (round < block.Rounds - 1)
             {
@@ -105,7 +116,7 @@ public static class TimelineResolver
 
         foreach (var effort in block.Round)
         {
-            steps.Add(Work(effort, duration: null));
+            steps.Add(Work([effort], duration: null));
         }
 
         return (block.Window, steps);
@@ -121,34 +132,144 @@ public static class TimelineResolver
 
         foreach (var task in block.Tasks)
         {
-            steps.Add(Work(task, duration: null));
+            steps.Add(Work([task], duration: null));
         }
 
         return (block.Cap, steps);
     }
 
-    private static TimelineStep Work(Effort effort, TimeSpan? duration) =>
-        new(
-            Ordinal: 0,
-            StepKind.Work,
-            Description: Describe(effort),
-            effort.Exercise,
-            effort.Reps,
-            effort.Weight,
-            duration);
+    // --- rep-driven --------------------------------------------------------------------------
+
+    /// <summary>Sets of a single movement, resting between them but not after the last.</summary>
+    private static (TimeSpan?, IReadOnlyList<TimelineStep>) ExpandStraight(StraightBlock block)
+    {
+        var steps = new List<TimelineStep>(block.Sets * 2);
+        var effort = new Effort(block.Exercise, block.Reps, block.Weight);
+
+        for (var set = 0; set < block.Sets; set++)
+        {
+            steps.Add(Work([effort], duration: null));
+
+            if (set < block.Sets - 1)
+            {
+                steps.Add(Rest(block.Rest));
+            }
+        }
+
+        return (null, steps);
+    }
+
+    /// <summary>
+    /// Stations in order, repeated for rounds. No rest between stations — moving straight to the
+    /// next station is what makes it a circuit.
+    /// </summary>
+    private static (TimeSpan?, IReadOnlyList<TimelineStep>) ExpandCircuit(CircuitBlock block)
+    {
+        var steps = new List<TimelineStep>((block.Stations.Count + 1) * block.Rounds);
+
+        for (var round = 0; round < block.Rounds; round++)
+        {
+            foreach (var station in block.Stations)
+            {
+                steps.Add(Work([station], duration: null));
+            }
+
+            if (round < block.Rounds - 1)
+            {
+                steps.Add(Rest(block.RestBetweenRounds));
+            }
+        }
+
+        return (null, steps);
+    }
+
+    /// <summary>
+    /// Each rung is its own set, because the rep count changes and each is logged separately.
+    /// Rest falls between rounds, not between rungs — climbing the ladder is the unbroken part.
+    /// </summary>
+    private static (TimeSpan?, IReadOnlyList<TimelineStep>) ExpandLadder(LadderBlock block)
+    {
+        var steps = new List<TimelineStep>((block.Rungs.Count + 1) * block.Rounds);
+
+        for (var round = 0; round < block.Rounds; round++)
+        {
+            foreach (var rung in block.Rungs)
+            {
+                steps.Add(Work([new Effort(block.Exercise, rung, block.Weight)], duration: null));
+            }
+
+            if (round < block.Rounds - 1)
+            {
+                steps.Add(Rest(block.RestBetweenRounds));
+            }
+        }
+
+        return (null, steps);
+    }
+
+    /// <summary>
+    /// One step per set covering every movement. The bell is never set down inside a complex, so
+    /// there is no point within it at which a set could be logged — the whole thing is one effort.
+    /// </summary>
+    private static (TimeSpan?, IReadOnlyList<TimelineStep>) ExpandComplex(ComplexBlock block)
+    {
+        var steps = new List<TimelineStep>(block.Sets * 2);
+        var description = string.Join(" + ", block.Movements.Select(Describe));
+
+        for (var set = 0; set < block.Sets; set++)
+        {
+            steps.Add(new TimelineStep(0, StepKind.Work, description, block.Movements, null));
+
+            if (set < block.Sets - 1)
+            {
+                steps.Add(Rest(block.Rest));
+            }
+        }
+
+        return (null, steps);
+    }
+
+    /// <summary>
+    /// One step per set, like a complex, but the reps are the per-cycle reps multiplied by the
+    /// number of cycles. The totals match an equivalent complex; the description carries the
+    /// difference, because performing clean-press five times is not five cleans then five presses.
+    /// </summary>
+    private static (TimeSpan?, IReadOnlyList<TimelineStep>) ExpandChain(ChainBlock block)
+    {
+        var steps = new List<TimelineStep>(block.Sets * 2);
+
+        var perSet = block.Links
+            .Select(link => link with { Reps = link.Reps * block.Cycles })
+            .ToList();
+
+        var cycle = string.Join(" + ", block.Links.Select(Describe));
+        var description = $"{block.Cycles} × ({cycle})";
+
+        for (var set = 0; set < block.Sets; set++)
+        {
+            steps.Add(new TimelineStep(0, StepKind.Work, description, perSet, null));
+
+            if (set < block.Sets - 1)
+            {
+                steps.Add(Rest(block.Rest));
+            }
+        }
+
+        return (null, steps);
+    }
+
+    // --- helpers -----------------------------------------------------------------------------
+
+    private static TimelineStep Work(IReadOnlyList<Effort> efforts, TimeSpan? duration) =>
+        new(0, StepKind.Work, string.Join(" + ", efforts.Select(Describe)), efforts, duration);
 
     private static TimelineStep Rest(TimeSpan duration) =>
-        new(
-            Ordinal: 0,
-            StepKind.Rest,
-            Description: $"Rest {Describe(duration)}",
-            Exercise: null,
-            Reps: null,
-            Weight: null,
-            duration);
+        new(0, StepKind.Rest, $"Rest {Describe(duration)}", [], duration);
 
     private static string Describe(Effort effort) =>
-        $"{effort.Reps} {effort.Exercise} @ {effort.Weight}";
+        effort.Reps is { } reps
+            ? $"{reps} × {effort.Exercise} @ {effort.Weight}"
+            : $"{effort.Exercise} @ {effort.Weight}";
 
     private static string Describe(TimeSpan duration) =>
         duration.TotalSeconds < 60

@@ -55,7 +55,7 @@ public class ClockDrivenResolverTests
 
         var resolved = ResolveSingle(block);
 
-        resolved.Steps.Select(step => step.Exercise)
+        resolved.Steps.Select(step => step.Efforts.Single().Exercise)
             .ShouldBe(["Swing", "Snatch", "Swing", "Snatch"]);
     }
 
@@ -106,7 +106,7 @@ public class ClockDrivenResolverTests
 
         // Reps are whatever fits in the window, so prescribing a count would be inventing one.
         resolved.Steps.Where(step => step.Kind == StepKind.Work)
-            .ShouldAllBe(step => step.Reps == null);
+            .ShouldAllBe(step => step.Efforts.Single().Reps == null);
     }
 
     // --- AMRAP ---------------------------------------------------------------------------------
@@ -201,14 +201,14 @@ public class ClockDrivenResolverTests
     }
 
     [Fact]
-    public void A_rep_driven_block_is_refused_rather_than_silently_dropped()
+    public void An_unknown_block_type_is_refused_rather_than_silently_dropped()
     {
-        var session = new TrainingSession("Not yet",
-        [
-            new StraightBlock("Press", "Press", Sets: 5, Reps: 5, Bell24, TimeSpan.FromSeconds(90)),
-        ]);
+        var session = new TrainingSession("Unknown", [new UnknownBlock("Mystery")]);
 
-        // Returning an empty step list would look like a session with nothing in it.
+        // All nine real types resolve. A tenth added without an expansion must fail loudly:
+        // returning an empty step list would render as a session with nothing in it.
         Should.Throw<NotSupportedException>(() => TimelineResolver.Resolve(session));
     }
+
+    private sealed record UnknownBlock(string Name) : TrainingBlock(Name);
 }

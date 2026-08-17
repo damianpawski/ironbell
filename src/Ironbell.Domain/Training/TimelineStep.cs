@@ -8,14 +8,14 @@ public enum StepKind
 }
 
 /// <summary>
-/// One entry in the resolved session timeline: the unit the training screen advances through.
+/// One entry in the resolved session timeline.
 /// </summary>
 /// <param name="Ordinal">Position in the session, from zero.</param>
 /// <param name="Kind">Work or rest.</param>
-/// <param name="Description">Coach-voice line for the screen, e.g. "10 swings @ 24 kg".</param>
-/// <param name="Exercise">Movement, when the step has one. Rest steps do not.</param>
-/// <param name="Reps">Target repetitions, when the step prescribes a count.</param>
-/// <param name="Weight">Bell in use, when the step has one.</param>
+/// <param name="Description">Coach-voice line for the screen, e.g. "10 × Swing @ 24 kg".</param>
+/// <param name="Efforts">
+/// The movements this step covers. Usually one; empty for rest.
+/// </param>
 /// <param name="Duration">
 /// How long the step lasts, or <see langword="null"/> when only the athlete can say.
 /// </param>
@@ -24,28 +24,27 @@ public enum StepKind
 /// The nullable duration is the important part of this shape. An EMOM window or a rest period is
 /// governed by the clock and its length is known before the session starts. A set of five heavy
 /// presses is not: it takes as long as it takes, and the step after it cannot have a start time
-/// until the set is logged.
+/// until the set is logged. Giving those steps an invented duration would let every screen pretend
+/// the session runs to a schedule, and would hollow out the ±250 ms accuracy gate, which is only a
+/// meaningful claim where the clock genuinely rules.
 /// </para>
 /// <para>
-/// Giving those steps an invented duration would let every screen pretend the whole session is on
-/// a schedule. It would also quietly hollow out the ±250 ms accuracy gate, which is only a
-/// meaningful claim where the clock genuinely rules. A null here says "ask the athlete", and that
-/// honesty is the point.
+/// A step holds a <em>list</em> of efforts rather than one, because a complex or a chain is a
+/// single unbroken effort across several movements — the bell never touches down, so there is no
+/// point inside it at which a set could be logged. Modelling those as one effort would have made
+/// their prescribed tonnage zero, and tonnage is the headline metric of the app.
 /// </para>
 /// </remarks>
 public sealed record TimelineStep(
     int Ordinal,
     StepKind Kind,
     string Description,
-    string? Exercise,
-    int? Reps,
-    BellWeight? Weight,
+    IReadOnlyList<Effort> Efforts,
     TimeSpan? Duration)
 {
     /// <summary>True when the clock owns this step; false when a logged set advances it.</summary>
     public bool IsTimed => Duration is not null;
 
     /// <summary>Weight moved by completing this step as prescribed.</summary>
-    public decimal PrescribedTonnage =>
-        Weight is { } weight && Reps is { } reps ? weight.TonnageFor(reps) : 0m;
+    public decimal PrescribedTonnage => Efforts.Sum(effort => effort.PrescribedTonnage);
 }
