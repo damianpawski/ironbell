@@ -1,3 +1,4 @@
+using Ironbell.Api.Features.Health.Live;
 using Ironbell.Api.Features.Health.Ping;
 
 namespace Ironbell.Api.Features;
@@ -11,12 +12,14 @@ internal static class FeatureRegistration
 {
     internal static IServiceCollection AddFeatures(this IServiceCollection services)
     {
+        services.AddLive();
         services.AddPing();
         return services;
     }
 
     internal static IEndpointRouteBuilder MapFeatures(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapLive();
         endpoints.MapPing();
         return endpoints;
     }

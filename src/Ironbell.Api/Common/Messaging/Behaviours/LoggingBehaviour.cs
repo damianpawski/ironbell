@@ -58,7 +58,11 @@ internal static partial class LoggingBehaviourLog
     [LoggerMessage(Level = LogLevel.Debug, Message = "Handling {RequestName}")]
     internal static partial void Handling(ILogger logger, string requestName);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Handled {RequestName} in {ElapsedMilliseconds} ms")]
+    // Debug, not Information. Serilog's request logging already records method, path, status and
+    // duration at Information, so an Information line here was a second entry saying much the same
+    // thing. It also mattered more once probes existed: a liveness check every few seconds would
+    // have made handler timing the loudest thing in the log.
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Handled {RequestName} in {ElapsedMilliseconds} ms")]
     internal static partial void Handled(ILogger logger, string requestName, double elapsedMilliseconds);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "{RequestName} failed after {ElapsedMilliseconds} ms")]

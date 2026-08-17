@@ -5,6 +5,7 @@ using Ironbell.Api.Common.Security;
 using Ironbell.Api.Features;
 using Ironbell.Infrastructure;
 using Serilog;
+using Serilog.Events;
 
 // Bootstrap logger, so anything that fails before configuration is read still reaches the console.
 // Deliberately CreateLogger and not CreateBootstrapLogger: the latter installs a ReloadableLogger
@@ -50,7 +51,19 @@ app.UseIronbellSecurityHeaders();
 // Order matters: the correlation id has to be on the log context before request logging closes
 // its completion line, otherwise that line is the one entry missing the id.
 app.UseCorrelationId();
-app.UseSerilogRequestLogging();
+
+app.UseSerilogRequestLogging(options =>
+{
+    // Health probes are the highest-frequency traffic this app will ever see and the least
+    // interesting. Logged at Verbose so they stay available when debugging and invisible otherwise,
+    // rather than burying real requests. Failures still surface at Error whatever the route.
+    options.GetLevel = static (httpContext, _, exception) =>
+        exception is not null || httpContext.Response.StatusCode >= 500
+            ? LogEventLevel.Error
+            : httpContext.Request.Path.StartsWithSegments("/api/health")
+                ? LogEventLevel.Verbose
+                : LogEventLevel.Information;
+});
 
 // Same origin as the API, in development as well as in the container, so the two never diverge.
 app.UseBlazorFrameworkFiles();
