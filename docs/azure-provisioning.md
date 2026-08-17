@@ -36,6 +36,58 @@ Keep all four.
 > The app will return 500 until migrations run. That is expected and correct: the schema is applied
 > by the pipeline, never by the application starting up.
 
+## 2b. Confirm it works, without touching CI
+
+The pipeline is not needed to prove the infrastructure is sound. This applies the schema by hand
+and checks the app end to end, which is the fastest way to find out whether Azure is happy before
+wiring up secrets.
+
+```bash
+# Values printed by step 2.
+SQL_FQDN=<sqlServerFqdn>
+APP_URL=<applicationUrl>
+
+# The app has no schema yet, so this correctly fails.
+curl -s -o /dev/null -w "before migrations: HTTP %{http_code}\n" "$APP_URL/api/health/ping"
+
+# Liveness needs no database, so this must already be 200.
+curl -s "$APP_URL/api/health/live"
+```
+
+Then apply the schema from your machine. The server's firewall only admits Azure services, so your
+address needs a temporary rule — the same dance the deploy job does:
+
+```bash
+MY_IP=$(curl -fsS https://api.ipify.org)
+
+az sql server firewall-rule create \
+  --resource-group ironbell --server <sqlServerName> \
+  --name manual-check --start-ip-address "$MY_IP" --end-ip-address "$MY_IP"
+
+pwsh ./scripts/build-migration-bundle.ps1 -Runtime win-x64 -Output artifacts/efbundle.exe
+
+./artifacts/efbundle.exe --connection \
+  "Server=tcp:$SQL_FQDN,1433;Initial Catalog=ironbell;User ID=ironbelladmin;Password=<password>;Encrypt=True;Connection Timeout=60;"
+
+az sql server firewall-rule delete \
+  --resource-group ironbell --server <sqlServerName> --name manual-check
+```
+
+Now the app should answer properly:
+
+```bash
+curl -s "$APP_URL/api/health/ping"
+# {"status":"ok","utc":"...","schemaVersion":"m0"}
+```
+
+Open `$APP_URL` in a browser and you should get the walking-skeleton screen reading `m0` from Azure
+SQL. That is M0's check, short of the phone.
+
+> **The first request after idle is slow.** The database pauses after 60 minutes and the app scales
+> to zero, so a cold start waits for both — expect 30 seconds or more. A connection timeout of 60
+> above is deliberate for that reason. It is not a fault; it is the price of the free tier, and
+> `minReplicas` goes to 1 at M7.
+
 ## 3. Service principal for the deploy job
 
 ```bash
@@ -87,6 +139,39 @@ Delete `credentials.json` afterwards.
 
 Push to `main`, or re-run the latest workflow. The deploy job applies migrations and then rolls the
 image — in that order, so the schema is in place before any container serving the new code exists.
+
+## Tearing it all down
+
+Everything lives in one resource group, so removing the group removes the lot.
+
+```bash
+pwsh ./scripts/teardown-azure.ps1
+```
+
+It lists what will go and makes you type the group name first. `-Force` skips that, `-Wait` blocks
+until deletion finishes rather than returning as soon as it starts. The raw equivalent is:
+
+```bash
+az group delete --name ironbell --yes --no-wait
+```
+
+**This deletes the database and everything in it.** While the only row is the seeded `app_info`
+that is exactly what you want. Once real training history exists it is not, and this stops being a
+convenience.
+
+### Repeating the create-and-delete cycle
+
+Two things behave oddly the second time round, both harmless once you know:
+
+- **Log Analytics soft-deletes for 14 days.** Recreating a workspace with the same name in the same
+  group inside that window recovers the old one rather than making a new one. Deployment succeeds
+  either way; do not be surprised to find old logs.
+- **The SQL server name is derived from the resource group id**, so recreating the same group in the
+  same subscription produces the same server name. That keeps things predictable, but if a delete is
+  still finishing, the next create can collide. Wait for `az group exists --name ironbell` to return
+  `false` before redeploying.
+
+Billing stops when deletion **starts**, so `--no-wait` costs nothing extra.
 
 ## Things worth knowing
 
