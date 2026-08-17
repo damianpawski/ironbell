@@ -20,7 +20,8 @@ public sealed record StraightBlock(
     int Sets,
     int Reps,
     BellWeight Weight,
-    TimeSpan Rest) : TrainingBlock(Name);
+    TimeSpan Rest,
+    int Bells = 1) : TrainingBlock(Name);
 
 /// <summary>Ordered stations, repeated for rounds, with rest between rounds.</summary>
 public sealed record CircuitBlock(
@@ -38,7 +39,8 @@ public sealed record LadderBlock(
     BellWeight Weight,
     IReadOnlyList<int> Rungs,
     int Rounds,
-    TimeSpan RestBetweenRounds) : TrainingBlock(Name);
+    TimeSpan RestBetweenRounds,
+    int Bells = 1) : TrainingBlock(Name);
 
 /// <summary>
 /// Several movements on one bell, all reps of each before moving on, without setting it down.
@@ -99,7 +101,8 @@ public sealed record IntervalBlock(
     BellWeight Weight,
     TimeSpan Work,
     TimeSpan Rest,
-    int Rounds) : TrainingBlock(Name);
+    int Rounds,
+    int Bells = 1) : TrainingBlock(Name);
 
 /// <summary>
 /// Fixed work, raced against the clock, optionally capped.

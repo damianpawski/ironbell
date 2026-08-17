@@ -85,7 +85,7 @@ public static class TimelineResolver
         var steps = new List<TimelineStep>(block.Rounds * 2);
 
         // Reps are whatever fits the window, so none are prescribed.
-        var effort = new Effort(block.Exercise, Reps: null, block.Weight);
+        var effort = new Effort(block.Exercise, Reps: null, block.Weight, block.Bells);
 
         for (var round = 0; round < block.Rounds; round++)
         {
@@ -144,7 +144,7 @@ public static class TimelineResolver
     private static (TimeSpan?, IReadOnlyList<TimelineStep>) ExpandStraight(StraightBlock block)
     {
         var steps = new List<TimelineStep>(block.Sets * 2);
-        var effort = new Effort(block.Exercise, block.Reps, block.Weight);
+        var effort = new Effort(block.Exercise, block.Reps, block.Weight, block.Bells);
 
         for (var set = 0; set < block.Sets; set++)
         {
@@ -195,7 +195,7 @@ public static class TimelineResolver
         {
             foreach (var rung in block.Rungs)
             {
-                steps.Add(Work([new Effort(block.Exercise, rung, block.Weight)], duration: null));
+                steps.Add(Work([new Effort(block.Exercise, rung, block.Weight, block.Bells)], duration: null));
             }
 
             if (round < block.Rounds - 1)
