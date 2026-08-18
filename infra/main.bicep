@@ -27,6 +27,9 @@ param sqlAdminPassword string
 @description('Container image to run. Pin a sha tag in production rather than latest.')
 param containerImage string = 'ghcr.io/damianpawski/ironbell:latest'
 
+@description('Persist logs to a Log Analytics workspace. Off by default; costs money and soft-deletes for 14 days.')
+param enableLogAnalytics bool = false
+
 @description('ASPNETCORE_ENVIRONMENT for the running container.')
 param aspNetCoreEnvironment string = 'Production'
 
@@ -99,16 +102,30 @@ resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-prev
 // Compute
 // ---------------------------------------------------------------------------
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+// Log Analytics is optional and off by default.
+//
+// Container Apps does not require it. With destination 'none' the platform still streams the
+// container's stdout, which is exactly where Serilog writes, so `az containerapp logs show
+// --follow` works either way. What is lost is queryable history — and the gap triage already cut
+// monitoring dashboards as ceremony at this scale.
+//
+// Ingestion for a single-user app that scales to zero would cost close to nothing, but close to
+// nothing is not nothing, and it is the only resource here without a hard free guarantee. It also
+// soft-deletes for fourteen days, which makes repeated create-and-delete cycles behave oddly.
+// Turn it on when log history actually matters.
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = if (enableLogAnalytics) {
   name: logAnalyticsName
   location: location
   properties: {
     sku: {
       name: 'PerGB2018'
     }
-    // Serilog is the real log story; this exists so `az containerapp logs` works at all. Short
-    // retention keeps it inside the free grant.
     retentionInDays: 30
+    // A hard ceiling rather than a hopeful one: ingestion stops for the day once it is reached, so
+    // a runaway logging bug cannot turn into an invoice.
+    workspaceCapping: {
+      dailyQuotaGb: json('0.1')
+    }
   }
 }
 
@@ -116,13 +133,17 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
   name: environmentName
   location: location
   properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalytics.properties.customerId
-        sharedKey: logAnalytics.listKeys().primarySharedKey
-      }
-    }
+    appLogsConfiguration: enableLogAnalytics
+      ? {
+          destination: 'log-analytics'
+          logAnalyticsConfiguration: {
+            customerId: logAnalytics!.properties.customerId
+            sharedKey: logAnalytics!.listKeys().primarySharedKey
+          }
+        }
+      : {
+          destination: 'none'
+        }
   }
 }
 

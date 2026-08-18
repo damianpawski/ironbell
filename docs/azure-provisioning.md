@@ -161,18 +161,48 @@ convenience.
 
 ### Repeating the create-and-delete cycle
 
-Two things behave oddly the second time round, both harmless once you know:
-
-- **Log Analytics soft-deletes for 14 days.** Recreating a workspace with the same name in the same
-  group inside that window recovers the old one rather than making a new one. Deployment succeeds
-  either way; do not be surprised to find old logs.
-- **The SQL server name is derived from the resource group id**, so recreating the same group in the
-  same subscription produces the same server name. That keeps things predictable, but if a delete is
-  still finishing, the next create can collide. Wait for `az group exists --name ironbell` to return
-  `false` before redeploying.
+- **Wait for the delete to finish before recreating.** The SQL server name is derived from the
+  resource group id, so recreating the same group in the same subscription produces the same server
+  name. That keeps things predictable, but a delete still in flight can collide with the next
+  create. Wait for `az group exists --name ironbell` to return `false`.
 
 Billing stops when deletion **starts**, so `--no-wait` costs nothing extra.
 
+## Logs, and why there is no Log Analytics workspace by default
+
+Container Apps does not need one. The platform streams the container's stdout, which is exactly
+where Serilog writes, so this works whether or not a workspace exists:
+
+```bash
+az containerapp logs show --name ironbell-api --resource-group ironbell --follow
+az containerapp logs show --name ironbell-api --resource-group ironbell --tail 200
+```
+
+What you give up is **queryable history**: logs are live only, so nothing is available for a crash
+that happened overnight. The gap triage already cut monitoring dashboards as ceremony at this
+scale, and correlation ids make a live tail genuinely usable.
+
+Ingestion for a single-user app that scales to zero would cost very little, but it is the only
+resource in the template without a hard free guarantee, and it soft-deletes for fourteen days —
+which makes repeated create-and-delete cycles behave strangely.
+
+Turn it on when history actually matters:
+
+```bash
+az deployment group create \
+  --resource-group ironbell \
+  --template-file infra/main.bicep \
+  --parameters sqlAdminLogin=ironbelladmin sqlAdminPassword='<password>' enableLogAnalytics=true
+```
+
+That adds a workspace with 30-day retention and a hard 0.1 GB/day ingestion cap, so a runaway
+logging bug stops rather than bills. Note the soft delete: recreating a workspace with the same
+name inside fourteen days recovers the old one, logs and all.
+
+**If you want durable logs without Azure Monitor**, a Serilog sink to an external collector is the
+alternative — Seq, Axiom and Better Stack all have free tiers. That trades an Azure cost for an
+external dependency and one more secret, so it is worth doing when there is a reason to look at
+logs after the fact, not before.
 ## Things worth knowing
 
 **Cold starts are stacked.** The database pauses after 60 minutes idle and the app scales to zero,
@@ -191,3 +221,4 @@ removes it again even if the migration fails.
 **SQL authentication, not managed identity.** Managed identity would remove the password entirely
 and is the better end state, but it also has to work for the migration bundle, which is a larger
 change than M0 needs. Worth doing before there is real user data.
+grep -n "Log Analytics soft-deletes" docs/azure-provisioning.md
