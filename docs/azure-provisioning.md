@@ -91,6 +91,26 @@ Copy the whole JSON object it prints — it is shown once and never again.
 Scoped to the resource group rather than the subscription so the credential cannot touch anything
 else. **It expires**; when a deploy starts failing to authenticate months from now, this is why.
 
+
+### After a teardown, the service principal needs its role back
+
+`az ad sp create-for-rbac --scopes .../resourceGroups/ironbell` creates two separate things: an
+app registration in the tenant, and a **role assignment scoped to the resource group**. Deleting
+the group deletes the role assignment; the app registration survives.
+
+So after recreating the group, do not run `create-for-rbac` again — that makes a second identity
+and a new secret. Grant the existing one its role back:
+
+```bash
+APP_ID=$(az ad sp list --display-name ironbell-deploy --query '[0].appId' -o tsv)
+SUB=$(az account show --query id -o tsv)
+
+az role assignment create --assignee $APP_ID --role contributor \
+  --scope /subscriptions/$SUB/resourceGroups/ironbell
+```
+
+`AZURE_CREDENTIALS` stays valid; only the assignment was lost.
+
 ## 4. GitHub configuration
 
 The deploy job stays inert until `DEPLOY_ENABLED` is `true`, so the workflow can be merged and
