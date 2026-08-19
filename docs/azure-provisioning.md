@@ -7,9 +7,9 @@ Everything below assumes the Azure SQL **free offer**, which is free for the
 lifetime of the subscription rather than for twelve months. See ADR 0001 in
 `ironbell-plan-v3-azure.md`.
 
-> **Region.** North Europe is the intended home, but Azure refuses new SQL servers there for some
-> subscriptions. If provisioning fails with `RegionDoesNotAllowProvisioning`, see *When
-> provisioning fails* below and pass `location=westeurope`.
+> **Region.** North Europe was the intended home, but this subscription is refused SQL server
+> creation in both North Europe and West Europe. **`uksouth` works** — pass `location=uksouth`. If
+> a region ever refuses, see *When provisioning fails* below.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ lifetime of the subscription rather than for twelve months. See ADR 0001 in
 ## 1. Resource group
 
 ```bash
-az group create --name ironbell --location northeurope
+az group create --name ironbell --location uksouth
 ```
 
 ## 2. Deploy the infrastructure
@@ -31,7 +31,7 @@ Choose a SQL administrator password and keep it somewhere durable — it is need
 az deployment group create \
   --resource-group ironbell \
   --template-file infra/main.bicep \
-  --parameters sqlAdminLogin=ironbelladmin sqlAdminPassword='<a-strong-password>'
+  --parameters location=uksouth sqlAdminLogin=ironbelladmin sqlAdminPassword='<a-strong-password>'
 ```
 
 The deployment prints `applicationUrl`, `containerAppName`, `sqlServerName` and `sqlServerFqdn`.
