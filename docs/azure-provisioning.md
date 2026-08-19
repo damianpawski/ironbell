@@ -42,55 +42,39 @@ Keep all four.
 
 ## 2b. Confirm it works, without touching CI
 
-The pipeline is not needed to prove the infrastructure is sound. This applies the schema by hand
-and checks the app end to end, which is the fastest way to find out whether Azure is happy before
-wiring up secrets.
+The pipeline is not needed to prove the infrastructure is sound. One script reads the deployment
+outputs, checks both health endpoints, and optionally applies the schema:
 
-```bash
-# Values printed by step 2.
-SQL_FQDN=<sqlServerFqdn>
-APP_URL=<applicationUrl>
+```powershell
+# Read-only: confirms the container serves and that readiness correctly refuses.
+./scripts/verify-azure.ps1
 
-# The app has no schema yet, so this correctly fails.
-curl -s -o /dev/null -w "before migrations: HTTP %{http_code}\n" "$APP_URL/api/health/ping"
-
-# Liveness needs no database, so this must already be 200.
-curl -s "$APP_URL/api/health/live"
+# Also applies migrations, opening a firewall rule for this machine and removing it afterwards.
+./scripts/verify-azure.ps1 -SqlPassword 'the-password-you-chose'
 ```
 
-Then apply the schema from your machine. The server's firewall only admits Azure services, so your
-address needs a temporary rule — the same dance the deploy job does:
+What it asserts, in order:
 
-```bash
-MY_IP=$(curl -fsS https://api.ipify.org)
+| Check | Before migrations | After |
+|---|---|---|
+| `GET /api/health/live` | **200** — needs no database | 200 |
+| `GET /api/health/ping` | **500** — no schema yet | 200, `schemaVersion: m0` |
 
-az sql server firewall-rule create \
-  --resource-group ironbell --server <sqlServerName> \
-  --name manual-check --start-ip-address "$MY_IP" --end-ip-address "$MY_IP"
+That pairing is the point. Liveness answering while readiness refuses is what stops a paused
+database from restarting healthy containers, and it is worth seeing it behave that way once.
 
-pwsh ./scripts/build-migration-bundle.ps1 -Runtime win-x64 -Output artifacts/efbundle.exe
-
-./artifacts/efbundle.exe --connection \
-  "Server=tcp:$SQL_FQDN,1433;Initial Catalog=ironbell;User ID=ironbelladmin;Password=<password>;Encrypt=True;Connection Timeout=60;"
-
-az sql server firewall-rule delete \
-  --resource-group ironbell --server <sqlServerName> --name manual-check
-```
-
-Now the app should answer properly:
-
-```bash
-curl -s "$APP_URL/api/health/ping"
-# {"status":"ok","utc":"...","schemaVersion":"m0"}
-```
-
-Open `$APP_URL` in a browser and you should get the walking-skeleton screen reading `m0` from Azure
-SQL. That is M0's check, short of the phone.
+Then open the printed URL in a browser: the walking-skeleton screen, reading `m0` out of Azure SQL.
+That is M0's check, short of the phone.
 
 > **The first request after idle is slow.** The database pauses after 60 minutes and the app scales
-> to zero, so a cold start waits for both — expect 30 seconds or more. A connection timeout of 60
-> above is deliberate for that reason. It is not a fault; it is the price of the free tier, and
-> `minReplicas` goes to 1 at M7.
+> to zero, so a cold start waits for both — expect 30 seconds or more. The script allows for it. It
+> is not a fault; it is the price of the free tier, and `minReplicas` goes to 1 at M7.
+
+Watch it work with:
+
+```powershell
+az containerapp logs show --name ironbell-api --resource-group ironbell --follow
+```
 
 ## 3. Service principal for the deploy job
 
