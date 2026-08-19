@@ -3,9 +3,13 @@
 Run once, by hand. Provisioning is rare and occasionally destructive, so it is deliberately not in
 the pipeline — CI only ever applies migrations and updates the container image.
 
-Everything below assumes **North Europe** and the Azure SQL **free offer**, which is free for the
+Everything below assumes the Azure SQL **free offer**, which is free for the
 lifetime of the subscription rather than for twelve months. See ADR 0001 in
 `ironbell-plan-v3-azure.md`.
+
+> **Region.** North Europe is the intended home, but Azure refuses new SQL servers there for some
+> subscriptions. If provisioning fails with `RegionDoesNotAllowProvisioning`, see *When
+> provisioning fails* below and pass `location=westeurope`.
 
 ## Prerequisites
 
@@ -203,6 +207,57 @@ name inside fourteen days recovers the old one, logs and all.
 alternative — Seq, Axiom and Better Stack all have free tiers. That trades an Azure cost for an
 external dependency and one more secret, so it is worth doing when there is a reason to look at
 logs after the fact, not before.
+## When provisioning fails
+
+### `RegionDoesNotAllowProvisioning`
+
+> Location 'North Europe' is not accepting creation of new Windows Azure SQL Database servers at
+> this time.
+
+Not a template problem. Azure restricts SQL server creation per region and per subscription, and
+new subscriptions are commonly blocked in popular regions. There is no reliable way to pre-check
+it; the practical answer is to try a nearby region.
+
+The location is a parameter, so nothing needs editing:
+
+```bash
+az deployment group create \
+  --resource-group ironbell \
+  --template-file infra/main.bicep \
+  --parameters location=westeurope sqlAdminLogin=ironbelladmin sqlAdminPassword='<password>'
+```
+
+Reasonable alternatives in order of proximity to Ireland: `westeurope`, `uksouth`,
+`francecentral`, `swedencentral`.
+
+**Tear down before retrying in a different region.** A failed SQL server can be left behind in a
+`Failed` state, and the server name is derived from the resource group id, so a redeploy tries to
+reuse the same name — which cannot change region. Start clean:
+
+```bash
+pwsh ./scripts/teardown-azure.ps1 -Wait
+az group create --name ironbell --location westeurope
+```
+
+If every region refuses, the restriction is on the subscription rather than the region, and lifting
+it needs a support request. That is worth knowing before trying six regions in turn.
+
+### `AppLogsConfiguration.Destination is invalid`
+
+Fixed. `destination: 'none'` is not accepted; the API's "or none" means send no configuration at
+all. The template now omits `appLogsConfiguration` entirely when `enableLogAnalytics` is false.
+
+### Checking what actually failed
+
+The top-level message is never the reason. This lists the individual operations:
+
+```bash
+az deployment operation group list \
+  --resource-group ironbell --name main \
+  --query "[?properties.provisioningState=='Failed'].{resource:properties.targetResource.resourceType, code:properties.statusMessage.error.code, message:properties.statusMessage.error.message}" \
+  --output table
+```
+
 ## Things worth knowing
 
 **Cold starts are stacked.** The database pauses after 60 minutes idle and the app scales to zero,

@@ -132,19 +132,21 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = if
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: environmentName
   location: location
-  properties: {
-    appLogsConfiguration: enableLogAnalytics
-      ? {
+  // With Log Analytics off, appLogsConfiguration is omitted entirely rather than given a 'none'
+  // destination. Azure rejects the literal string: "Supported values: 'log-analytics',
+  // 'azure-monitor' or none" means send no configuration at all, not the word none. Logs still
+  // stream from the container's stdout either way.
+  properties: enableLogAnalytics
+    ? {
+        appLogsConfiguration: {
           destination: 'log-analytics'
           logAnalyticsConfiguration: {
             customerId: logAnalytics!.properties.customerId
             sharedKey: logAnalytics!.listKeys().primarySharedKey
           }
         }
-      : {
-          destination: 'none'
-        }
-  }
+      }
+    : {}
 }
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
